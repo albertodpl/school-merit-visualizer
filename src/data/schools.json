@@ -1,0 +1,223 @@
+[
+  {
+    "id": "57243353",
+    "name": "Fredrikshovs slotts skola",
+    "coordinates": [59.3386, 18.0958],
+    "municipality": "Stockholm",
+    "type": "independent",
+    "address": {
+      "street": "Fredrikshovsgatan 6",
+      "postalCode": "11523",
+      "city": "Stockholm"
+    },
+    "statistics": {
+      "meritValue": 311.2,
+      "meritHistory": [
+        { "year": "2024/25", "value": 311.2 },
+        { "year": "2023/24", "value": 308.5 },
+        { "year": "2022/23", "value": 305.1 }
+      ],
+      "studentsPerTeacher": 11.2,
+      "certifiedTeachersRatio": 95,
+      "passRateGrade9": 100
+    }
+  },
+  {
+    "id": "12345001",
+    "name": "Stockholms internationella skola",
+    "coordinates": [59.3526, 18.0734],
+    "municipality": "Stockholm",
+    "type": "independent",
+    "address": {
+      "street": "Johannesgatan 18",
+      "postalCode": "11138",
+      "city": "Stockholm"
+    },
+    "statistics": {
+      "meritValue": 295.8,
+      "meritHistory": [
+        { "year": "2024/25", "value": 295.8 },
+        { "year": "2023/24", "value": 291.2 }
+      ],
+      "studentsPerTeacher": 12.5,
+      "certifiedTeachersRatio": 88,
+      "passRateGrade9": 98
+    }
+  },
+  {
+    "id": "12345002",
+    "name": "Södermalmsskolan",
+    "coordinates": [59.3145, 18.0686],
+    "municipality": "Stockholm",
+    "type": "municipal",
+    "address": {
+      "street": "Södermannagatan 45",
+      "postalCode": "11640",
+      "city": "Stockholm"
+    },
+    "statistics": {
+      "meritValue": 248.3,
+      "meritHistory": [
+        { "year": "2024/25", "value": 248.3 },
+        { "year": "2023/24", "value": 245.1 }
+      ],
+      "studentsPerTeacher": 14.2,
+      "certifiedTeachersRatio": 82,
+      "passRateGrade9": 91
+    }
+  },
+  {
+    "id": "12345003",
+    "name": "Kungsholmens grundskola",
+    "coordinates": [59.3307, 18.0372],
+    "municipality": "Stockholm",
+    "type": "municipal",
+    "address": {
+      "street": "Kungsholmsgatan 15",
+      "postalCode": "11227",
+      "city": "Stockholm"
+    },
+    "statistics": {
+      "meritValue": 265.7,
+      "meritHistory": [
+        { "year": "2024/25", "value": 265.7 },
+        { "year": "2023/24", "value": 260.2 }
+      ],
+      "studentsPerTeacher": 13.1,
+      "certifiedTeachersRatio": 85,
+      "passRateGrade9": 94
+    }
+  },
+  {
+    "id": "12345004",
+    "name": "Östermalms grundskola",
+    "coordinates": [59.3411, 18.0912],
+    "municipality": "Stockholm",
+    "type": "municipal",
+    "address": {
+      "street": "Karlavägen 100",
+      "postalCode": "11526",
+      "city": "Stockholm"
+    },
+    "statistics": {
+      "meritValue": 278.4,
+      "meritHistory": [
+        { "year": "2024/25", "value": 278.4 },
+        { "year": "2023/24", "value": 275.1 }
+      ],
+      "studentsPerTeacher": 12.8,
+      "certifiedTeachersRatio": 90,
+      "passRateGrade9": 96
+    }
+  },
+  {
+    "id": "12345005",
+    "name": "Norra Real grundskola",
+    "coordinates": [59.3481, 18.0595],
+    "municipality": "Stockholm",
+    "type": "municipal",
+    "address": {
+      "street": "Roslagsgatan 1",
+      "postalCode": "11355",
+      "city": "Stockholm"
+    },
+    "statistics": {
+      "meritValue": 225.6,
+      "meritHistory": [
+        { "year": "2024/25", "value": 225.6 },
+        { "year": "2023/24", "value": 220.3 }
+      ],
+      "studentsPerTeacher": 15.3,
+      "certifiedTeachersRatio": 78,
+      "passRateGrade9": 85
+    }
+  },
+  {
+    "id": "12345006",
+    "name": "Täby enskilda gymnasium grundskola",
+    "coordinates": [59.4365, 18.0651],
+    "municipality": "Täby",
+    "type": "independent",
+    "address": {
+      "street": "Attundavägen 2",
+      "postalCode": "18340",
+      "city": "Täby"
+    },
+    "statistics": {
+      "meritValue": 289.2,
+      "meritHistory": [
+        { "year": "2024/25", "value": 289.2 },
+        { "year": "2023/24", "value": 285.7 }
+      ],
+      "studentsPerTeacher": 11.8,
+      "certifiedTeachersRatio": 92,
+      "passRateGrade9": 99
+    }
+  },
+  {
+    "id": "12345007",
+    "name": "Solna gymnasium grundskola",
+    "coordinates": [59.3631, 18.0048],
+    "municipality": "Solna",
+    "type": "municipal",
+    "address": {
+      "street": "Solnavägen 95",
+      "postalCode": "17165",
+      "city": "Solna"
+    },
+    "statistics": {
+      "meritValue": 198.5,
+      "meritHistory": [
+        { "year": "2024/25", "value": 198.5 },
+        { "year": "2023/24", "value": 195.2 }
+      ],
+      "studentsPerTeacher": 16.1,
+      "certifiedTeachersRatio": 72,
+      "passRateGrade9": 78
+    }
+  },
+  {
+    "id": "12345008",
+    "name": "Nacka enskilda grundskola",
+    "coordinates": [59.3104, 18.1648],
+    "municipality": "Nacka",
+    "type": "independent",
+    "address": {
+      "street": "Värmdövägen 120",
+      "postalCode": "13145",
+      "city": "Nacka"
+    },
+    "statistics": {
+      "meritValue": 302.1,
+      "meritHistory": [
+        { "year": "2024/25", "value": 302.1 },
+        { "year": "2023/24", "value": 298.4 }
+      ],
+      "studentsPerTeacher": 10.9,
+      "certifiedTeachersRatio": 94,
+      "passRateGrade9": 100
+    }
+  },
+  {
+    "id": "12345009",
+    "name": "Lidingö centralskola",
+    "coordinates": [59.3661, 18.1446],
+    "municipality": "Lidingö",
+    "type": "municipal",
+    "address": {
+      "street": "Lejonvägen 15",
+      "postalCode": "18131",
+      "city": "Lidingö"
+    },
+    "statistics": {
+      "meritValue": 271.8,
+      "meritHistory": [
+        { "year": "2024/25", "value": 271.8 },
+        { "year": "2023/24", "value": 268.5 }
+      ],
+      "studentsPerTeacher": 12.4,
+      "certifiedTeachersRatio": 88,
+      "passRateGrade9": 95
+    }
+  }
+]
