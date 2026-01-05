@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Pairingbuddy state files
 .pairingbuddy/
+
+# Raw data cache (large, regenerate with pnpm run fetch-data)
+src/data/raw/

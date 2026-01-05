@@ -1,10 +1,18 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { School, getMeritLevel, getMeritColor, calculateDistance } from '@/lib/types';
+import {
+  School,
+  getMeritLevel,
+  getMeritColor,
+  calculateDistance,
+  getCategoryColor,
+  getPerformanceLevel,
+  getPerformanceColor,
+} from '@/lib/types';
 import SchoolPopup from './SchoolPopup';
 import Legend from './Legend';
 import FilterPanel from './FilterPanel';
@@ -17,23 +25,46 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-function createMeritIcon(meritValue: number | null): L.DivIcon {
-  const level = getMeritLevel(meritValue);
-  const color = getMeritColor(level);
+type ColorMode = 'performance' | 'category';
+
+function createSchoolIcon(school: School, colorMode: ColorMode): L.DivIcon {
+  let color: string;
+
+  if (colorMode === 'category') {
+    color = getCategoryColor(school.category);
+  } else {
+    // Performance-based coloring
+    if (school.category === 'F-9' || school.category === '7-9') {
+      // Use merit for grade 9 schools
+      const level = getMeritLevel(school.statistics.meritValue);
+      color = getMeritColor(level);
+    } else if (school.category === 'F-6') {
+      // Use pass rate for grade 6 schools
+      const level = getPerformanceLevel(school.statistics.passRateGrade6, 100);
+      color = getPerformanceColor(level);
+    } else {
+      // Gymnasium or other - use category color
+      color = getCategoryColor(school.category);
+    }
+  }
+
+  // Category shape indicators
+  const isGymnasium = school.category === 'gymnasium';
+  const borderRadius = isGymnasium ? '4px' : '50%';
 
   return L.divIcon({
-    className: 'merit-marker',
+    className: 'school-marker',
     html: `<div style="
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       background: ${color};
       border: 2px solid white;
-      border-radius: 50%;
+      border-radius: ${borderRadius};
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     "></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -11],
   });
 }
 
@@ -82,6 +113,25 @@ function MapClickHandler({ onMapClick, isSettingHome }: MapClickHandlerProps) {
   return null;
 }
 
+// Component to programmatically control the map
+interface MapControllerProps {
+  center: [number, number] | null;
+  onCenterHandled: () => void;
+}
+
+function MapController({ center, onCenterHandled }: MapControllerProps) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center) {
+      map.flyTo(center, 14, { duration: 1 });
+      onCenterHandled();
+    }
+  }, [center, map, onCenterHandled]);
+
+  return null;
+}
+
 interface SchoolMapProps {
   schools: School[];
 }
@@ -91,6 +141,8 @@ export default function SchoolMap({ schools }: SchoolMapProps) {
   const [isSettingHome, setIsSettingHome] = useState(false);
   const [filteredSchools, setFilteredSchools] = useState<School[]>(schools);
   const [sortBy, setSortBy] = useState<'merit' | 'distance'>('merit');
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [colorMode, setColorMode] = useState<ColorMode>('category');
 
   // Load home position from localStorage
   useEffect(() => {
@@ -115,6 +167,16 @@ export default function SchoolMap({ schools }: SchoolMapProps) {
   const handleClearHome = useCallback(() => {
     setHomePosition(null);
     localStorage.removeItem('homePosition');
+  }, []);
+
+  const handleHomePositionChange = useCallback((lat: number, lng: number) => {
+    setHomePosition({ lat, lng });
+    setMapCenter([lat, lng]);
+    setIsSettingHome(false);
+  }, []);
+
+  const handleMapCenterHandled = useCallback(() => {
+    setMapCenter(null);
   }, []);
 
   // Sort schools based on selection
@@ -148,6 +210,7 @@ export default function SchoolMap({ schools }: SchoolMapProps) {
         />
 
         <MapClickHandler onMapClick={handleMapClick} isSettingHome={isSettingHome} />
+        <MapController center={mapCenter} onCenterHandled={handleMapCenterHandled} />
 
         {/* Home marker */}
         {homePosition && (
@@ -193,7 +256,7 @@ export default function SchoolMap({ schools }: SchoolMapProps) {
             <Marker
               key={school.id}
               position={school.coordinates}
-              icon={createMeritIcon(school.statistics.meritValue)}
+              icon={createSchoolIcon(school, colorMode)}
             >
               <Popup>
                 <SchoolPopup
@@ -215,12 +278,15 @@ export default function SchoolMap({ schools }: SchoolMapProps) {
         isSettingHome={isSettingHome}
         onSetHomeClick={() => setIsSettingHome(!isSettingHome)}
         onClearHome={handleClearHome}
+        onHomePositionChange={handleHomePositionChange}
         sortBy={sortBy}
         onSortChange={setSortBy}
+        colorMode={colorMode}
+        onColorModeChange={setColorMode}
       />
 
       {/* Legend */}
-      <Legend />
+      <Legend colorMode={colorMode} />
 
       {/* Setting home mode indicator */}
       {isSettingHome && (

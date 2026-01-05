@@ -7,39 +7,51 @@ const ACCEPT_HEADER = 'application/vnd.skolverket.plannededucations.api.v3.hal+j
 interface CompactSchoolUnit {
   schoolUnitCode: string;
   schoolUnitName: string;
-  wgs84Latitude: number;
-  wgs84Longitude: number;
-  educationEventTypeOfSchooling?: string;
+  wgs84Latitude: string;
+  wgs84Longitude: string;
+  abroadSchool: boolean;
 }
 
 interface ApiResponse {
-  _embedded?: {
-    listedSchoolUnits?: CompactSchoolUnit[];
-  };
-  page?: {
-    totalElements: number;
-    totalPages: number;
-    number: number;
+  status: string;
+  body: {
+    _embedded?: {
+      compactSchoolUnits?: CompactSchoolUnit[];
+    };
+    page?: {
+      totalPages: number;
+    };
   };
 }
 
-interface SchoolUnitDetail {
-  schoolUnitCode: string;
-  schoolUnitName: string;
+interface StatValue {
+  value: string;
+  valueType: string;
+  timePeriod: string;
+}
+
+interface StatisticsBody {
+  averageGradesMeritRating9thGrade?: StatValue[];
+  studentsPerTeacherQuota?: StatValue[];
+  certifiedTeachersQuota?: StatValue[];
+  ratioOfPupilsIn9thGradeWithAllSubjectsPassed?: StatValue[];
+  [key: string]: unknown;
+}
+
+interface SchoolDetailBody {
+  code: string;
+  name: string;
   principalOrganizerType?: string;
-  visitingAddress?: {
-    street?: string;
-    zipCode?: string;
-    city?: string;
+  contactInfo?: {
+    addresses?: Array<{
+      type: string;
+      street?: string;
+      zipCode?: string;
+      city?: string;
+    }>;
   };
   geographicalAreaCode?: string;
-}
-
-interface StatisticsResponse {
-  gradeNineAverageMeritRating?: Record<string, number>;
-  studentTeacherQuota?: Record<string, number>;
-  certifiedTeachersQuota?: Record<string, number>;
-  gradeNineAllSubjectsPassedRatio?: Record<string, number>;
+  [key: string]: unknown;
 }
 
 interface School {
@@ -62,6 +74,43 @@ interface School {
   };
 }
 
+interface RawSchoolData {
+  schoolUnitCode: string;
+  compactData: CompactSchoolUnit;
+  details: SchoolDetailBody | null;
+  statistics: StatisticsBody | null;
+}
+
+// Parse Swedish decimal format "217,6" to 217.6
+function parseSwedishNumber(value: string | undefined): number | null {
+  if (!value || value === '.' || value === '-') return null;
+  const parsed = parseFloat(value.replace(',', '.'));
+  return isNaN(parsed) ? null : parsed;
+}
+
+// Get most recent value from StatValue array
+function getMostRecentValue(data: StatValue[] | undefined): number | null {
+  if (!data || data.length === 0) return null;
+  for (const entry of data) {
+    if (entry.valueType === 'EXISTS') {
+      return parseSwedishNumber(entry.value);
+    }
+  }
+  return null;
+}
+
+// Get merit history from StatValue array
+function getMeritHistory(data: StatValue[] | undefined): { year: string; value: number }[] {
+  if (!data) return [];
+  return data
+    .filter(entry => entry.valueType === 'EXISTS')
+    .map(entry => ({
+      year: entry.timePeriod,
+      value: parseSwedishNumber(entry.value) || 0,
+    }))
+    .slice(0, 5);
+}
+
 async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
   for (let i = 0; i < retries; i++) {
     try {
@@ -70,9 +119,12 @@ async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
       });
       if (response.ok) return response;
       if (response.status === 429) {
-        // Rate limited, wait and retry
+        console.log(`  Rate limited, waiting ${2 * (i + 1)}s...`);
         await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
         continue;
+      }
+      if (response.status === 404) {
+        throw new Error('NOT_FOUND');
       }
       throw new Error(`HTTP ${response.status}`);
     } catch (error) {
@@ -95,150 +147,179 @@ async function fetchAllSchoolUnits(): Promise<CompactSchoolUnit[]> {
     const response = await fetchWithRetry(url);
     const data: ApiResponse = await response.json();
 
-    if (data._embedded?.listedSchoolUnits) {
-      schools.push(...data._embedded.listedSchoolUnits);
+    if (data.body?._embedded?.compactSchoolUnits) {
+      schools.push(...data.body._embedded.compactSchoolUnits);
     }
 
-    if (data.page) {
-      totalPages = data.page.totalPages;
+    if (data.body?.page) {
+      totalPages = data.body.page.totalPages;
     }
 
     page++;
-    console.log(`  Page ${page}/${totalPages} - ${schools.length} schools`);
+    if (page % 10 === 0 || page === totalPages) {
+      console.log(`  Page ${page}/${totalPages} - ${schools.length} schools`);
+    }
 
-    // Be nice to the API
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
 
   return schools;
 }
 
-async function fetchSchoolDetails(schoolUnitCode: string): Promise<SchoolUnitDetail | null> {
+async function fetchSchoolDetails(schoolUnitCode: string): Promise<SchoolDetailBody | null> {
   try {
     const url = `${API_BASE}/school-units/${schoolUnitCode}`;
     const response = await fetchWithRetry(url);
-    return await response.json();
-  } catch (error) {
-    console.warn(`  Failed to fetch details for ${schoolUnitCode}`);
+    const data = await response.json();
+    return data.body || null;
+  } catch {
     return null;
   }
 }
 
-async function fetchSchoolStatistics(schoolUnitCode: string): Promise<StatisticsResponse | null> {
+async function fetchSchoolStatistics(schoolUnitCode: string): Promise<StatisticsBody | null> {
   try {
     const url = `${API_BASE}/school-units/${schoolUnitCode}/statistics/gr`;
     const response = await fetchWithRetry(url);
-    return await response.json();
-  } catch (error) {
-    // Not all schools have GR statistics
+    const data = await response.json();
+    return data.body || null;
+  } catch {
     return null;
   }
 }
 
-function isGrundskola(school: CompactSchoolUnit): boolean {
-  // Filter for grundskola (primary/secondary education)
-  // The educationEventTypeOfSchooling might contain 'GR' or similar
-  // We'll also include schools without this field if they have coordinates
-  return school.wgs84Latitude !== undefined &&
-         school.wgs84Longitude !== undefined &&
-         school.wgs84Latitude !== 0 &&
-         school.wgs84Longitude !== 0;
+function hasValidCoordinates(school: CompactSchoolUnit): boolean {
+  const lat = parseFloat(school.wgs84Latitude);
+  const lng = parseFloat(school.wgs84Longitude);
+  return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && !school.abroadSchool;
 }
 
-function getMostRecentValue(data: Record<string, number> | undefined): number | null {
-  if (!data) return null;
-  const years = Object.keys(data).sort().reverse();
-  if (years.length === 0) return null;
-  return data[years[0]];
-}
+function processSchoolData(raw: RawSchoolData): School {
+  const { compactData, details, statistics } = raw;
 
-function getMeritHistory(data: Record<string, number> | undefined): { year: string; value: number }[] {
-  if (!data) return [];
-  return Object.entries(data)
-    .map(([year, value]) => ({ year, value }))
-    .sort((a, b) => b.year.localeCompare(a.year))
-    .slice(0, 5); // Last 5 years
-}
+  const visitingAddress = details?.contactInfo?.addresses?.find(
+    a => a.type === 'VISITING_ADDRESS'
+  );
 
-function getMunicipalityFromCode(code: string | undefined): string {
-  // The geographical area code contains municipality info
-  // For now, we'll just return "Unknown" if not available
-  // TODO: Map codes to names
-  return code || 'Unknown';
+  return {
+    id: compactData.schoolUnitCode,
+    name: compactData.schoolUnitName,
+    coordinates: [
+      parseFloat(compactData.wgs84Latitude),
+      parseFloat(compactData.wgs84Longitude),
+    ],
+    municipality: visitingAddress?.city || 'Unknown',
+    type: details?.principalOrganizerType === 'Kommunal' ? 'municipal' : 'independent',
+    address: {
+      street: visitingAddress?.street || '',
+      postalCode: visitingAddress?.zipCode || '',
+      city: visitingAddress?.city || '',
+    },
+    statistics: {
+      meritValue: getMostRecentValue(statistics?.averageGradesMeritRating9thGrade),
+      meritHistory: getMeritHistory(statistics?.averageGradesMeritRating9thGrade),
+      studentsPerTeacher: getMostRecentValue(statistics?.studentsPerTeacherQuota),
+      certifiedTeachersRatio: getMostRecentValue(statistics?.certifiedTeachersQuota),
+      passRateGrade9: getMostRecentValue(statistics?.ratioOfPupilsIn9thGradeWithAllSubjectsPassed),
+    },
+  };
 }
 
 async function main() {
   console.log('Starting school data fetch...\n');
 
+  // Create data directory for raw data
+  const rawDataDir = path.join(__dirname, '../src/data/raw');
+  if (!fs.existsSync(rawDataDir)) {
+    fs.mkdirSync(rawDataDir, { recursive: true });
+  }
+
   // Fetch all school units
   const allSchools = await fetchAllSchoolUnits();
   console.log(`\nTotal schools fetched: ${allSchools.length}`);
 
-  // Filter for schools with coordinates (likely grundskolor)
-  const schoolsWithCoords = allSchools.filter(isGrundskola);
-  console.log(`Schools with coordinates: ${schoolsWithCoords.length}`);
+  // Save raw compact data
+  fs.writeFileSync(
+    path.join(rawDataDir, 'compact-school-units.json'),
+    JSON.stringify(allSchools, null, 2)
+  );
+  console.log('Saved raw compact school units data');
 
-  // Fetch details and statistics for each school
+  const schoolsWithCoords = allSchools.filter(hasValidCoordinates);
+  console.log(`Schools with valid coordinates: ${schoolsWithCoords.length}`);
+
+  // Collect all raw data
+  const rawData: RawSchoolData[] = [];
   const schools: School[] = [];
   let processed = 0;
+  let withMeritData = 0;
 
   console.log('\nFetching details and statistics...');
+  console.log('(This will take several minutes for ~6500 schools)\n');
 
-  for (const school of schoolsWithCoords) {
-    processed++;
-    if (processed % 100 === 0) {
-      console.log(`  Processed ${processed}/${schoolsWithCoords.length}`);
+  const batchSize = 10;
+  for (let i = 0; i < schoolsWithCoords.length; i += batchSize) {
+    const batch = schoolsWithCoords.slice(i, i + batchSize);
+
+    const results = await Promise.all(
+      batch.map(async (school) => {
+        const [details, statistics] = await Promise.all([
+          fetchSchoolDetails(school.schoolUnitCode),
+          fetchSchoolStatistics(school.schoolUnitCode),
+        ]);
+        return {
+          schoolUnitCode: school.schoolUnitCode,
+          compactData: school,
+          details,
+          statistics
+        };
+      })
+    );
+
+    for (const raw of results) {
+      processed++;
+      rawData.push(raw);
+
+      const school = processSchoolData(raw);
+      schools.push(school);
+      if (school.statistics.meritValue !== null) {
+        withMeritData++;
+      }
     }
 
-    const [details, stats] = await Promise.all([
-      fetchSchoolDetails(school.schoolUnitCode),
-      fetchSchoolStatistics(school.schoolUnitCode),
-    ]);
+    if (processed % 500 === 0 || processed === schoolsWithCoords.length) {
+      console.log(`  Processed ${processed}/${schoolsWithCoords.length} - Found ${withMeritData} with merit data`);
+    }
 
-    // Only include schools that have merit data
-    const meritValue = getMostRecentValue(stats?.gradeNineAverageMeritRating);
-    if (meritValue === null) continue;
-
-    const schoolData: School = {
-      id: school.schoolUnitCode,
-      name: school.schoolUnitName,
-      coordinates: [school.wgs84Latitude, school.wgs84Longitude],
-      municipality: getMunicipalityFromCode(details?.geographicalAreaCode),
-      type: details?.principalOrganizerType === 'Kommunal' ? 'municipal' : 'independent',
-      address: {
-        street: details?.visitingAddress?.street || '',
-        postalCode: details?.visitingAddress?.zipCode || '',
-        city: details?.visitingAddress?.city || '',
-      },
-      statistics: {
-        meritValue,
-        meritHistory: getMeritHistory(stats?.gradeNineAverageMeritRating),
-        studentsPerTeacher: getMostRecentValue(stats?.studentTeacherQuota),
-        certifiedTeachersRatio: getMostRecentValue(stats?.certifiedTeachersQuota),
-        passRateGrade9: getMostRecentValue(stats?.gradeNineAllSubjectsPassedRatio),
-      },
-    };
-
-    schools.push(schoolData);
-
-    // Rate limiting
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   console.log(`\nSchools with merit data: ${schools.length}`);
 
-  // Write to file
+  // Save all raw data for offline processing
+  fs.writeFileSync(
+    path.join(rawDataDir, 'all-school-data.json'),
+    JSON.stringify(rawData, null, 2)
+  );
+  console.log(`\nSaved all raw data to ${path.join(rawDataDir, 'all-school-data.json')}`);
+
+  // Sort and save processed data
+  schools.sort((a, b) => (b.statistics.meritValue || 0) - (a.statistics.meritValue || 0));
+
   const outputPath = path.join(__dirname, '../src/data/schools.json');
   fs.writeFileSync(outputPath, JSON.stringify(schools, null, 2));
-  console.log(`\nData written to ${outputPath}`);
+  console.log(`Saved processed data to ${outputPath}`);
 
-  // Print some stats
+  // Print stats
   const avgMerit = schools.reduce((sum, s) => sum + (s.statistics.meritValue || 0), 0) / schools.length;
+  const municipalities = [...new Set(schools.map(s => s.municipality))];
   console.log(`\nStats:`);
-  console.log(`  Total schools: ${schools.length}`);
+  console.log(`  Total schools with merit data: ${schools.length}`);
   console.log(`  Average merit: ${avgMerit.toFixed(1)}`);
+  console.log(`  Highest merit: ${schools[0]?.statistics.meritValue?.toFixed(1)} (${schools[0]?.name})`);
   console.log(`  Municipal: ${schools.filter(s => s.type === 'municipal').length}`);
   console.log(`  Independent: ${schools.filter(s => s.type === 'independent').length}`);
+  console.log(`  Municipalities: ${municipalities.length}`);
 }
 
 main().catch(console.error);

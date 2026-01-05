@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "fetch-data": "tsx scripts/fetch-schools.ts"
+    "fetch-data": "tsx scripts/fetch-schools.ts",
+    "process-data": "tsx scripts/process-raw-data.ts"
   },
   "dependencies": {
     "@fontsource/geist": "^5.2.6",
