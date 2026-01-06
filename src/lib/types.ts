@@ -4,6 +4,21 @@ export interface SchoolAddress {
   city: string;
 }
 
+export interface DataMetadata {
+  fetchedAt: string;
+  processedAt: string;
+  totalSchools: number;
+  byCategory: Record<string, number>;
+  withMeritData: number;
+  withGrade6Data: number;
+  withGymnasiumData: number;
+}
+
+export interface SchoolData {
+  metadata: DataMetadata;
+  schools: School[];
+}
+
 export interface MeritHistory {
   year: string;
   value: number;
@@ -12,16 +27,31 @@ export interface MeritHistory {
 // School category based on grade levels
 export type SchoolCategory = 'F-6' | 'F-9' | '7-9' | 'gymnasium' | 'anpassad' | 'other';
 
+// Gymnasium program data
+export interface GymnasiumProgram {
+  code: string;
+  universityEligibilityRate: number | null; // % eligible for university
+  gradePoints: number | null; // average grade points (0-20 scale)
+  graduationRate: number | null; // % graduating within 3 years
+  admissionPointsAvg: number | null; // average admission points
+  admissionPointsMin: number | null; // minimum admission points
+}
+
 export interface SchoolStatistics {
-  // Grade 9 data (F-9, 7-9 schools)
+  // Grundskola Grade 9 data (F-9, 7-9 schools)
   meritValue: number | null;
   meritHistory: MeritHistory[];
   passRateGrade9: number | null;
-  // Grade 6 data (F-6, F-9 schools)
+  // Grundskola Grade 6 data (F-6, F-9 schools)
   passRateGrade6: number | null;
   avgTestSwedish6: number | null;
   avgTestEnglish6: number | null;
   avgTestMath6: number | null;
+  // Gymnasium data (aggregated across programs)
+  universityEligibilityRate: number | null; // % eligible for university
+  gradePoints: number | null; // average grade points (0-20 scale)
+  graduationRate: number | null; // % graduating within 3 years
+  programs: GymnasiumProgram[]; // per-program data
   // Common data
   studentsPerTeacher: number | null;
   certifiedTeachersRatio: number | null;
@@ -145,6 +175,79 @@ export const TEST_BENCHMARKS = {
   english: { avg: 15.6, p75: 16.6, p90: 17.4, max: 20 },
   math: { avg: 11.4, p75: 12.9, p90: 14.2, max: 20 },
 } as const;
+
+// Gymnasium benchmarks (national averages)
+export const GYMNASIUM_BENCHMARKS = {
+  universityEligibilityRate: { avg: 73, p75: 85, p90: 95 }, // % eligible for university
+  gradePoints: { avg: 14.0, p75: 14.8, p90: 15.5, max: 20 }, // 0-20 scale
+  graduationRate: { avg: 78, p75: 88, p90: 95 }, // % graduating within 3 years
+} as const;
+
+// Get performance level for gymnasium stats
+export function getGymnasiumPerformanceLevel(
+  value: number | null,
+  metric: 'universityEligibilityRate' | 'gradePoints' | 'graduationRate'
+): PerformanceLevel | null {
+  if (value === null) return null;
+  const bench = GYMNASIUM_BENCHMARKS[metric];
+
+  if (value >= bench.p90) return 'high';
+  if (value >= bench.p75) return 'above-avg';
+  if (value >= bench.avg) return 'avg';
+  if (value >= bench.avg * 0.85) return 'below-avg';
+  return 'low';
+}
+
+// Get descriptive label for gymnasium performance
+export function getGymnasiumPerformanceLabel(
+  value: number | null,
+  metric: 'universityEligibilityRate' | 'gradePoints' | 'graduationRate'
+): string {
+  if (value === null) return '';
+  const bench = GYMNASIUM_BENCHMARKS[metric];
+
+  if (value >= bench.p90) return 'Topp 10%';
+  if (value >= bench.p75) return 'Topp 25%';
+  if (value >= bench.avg) return 'Över snitt';
+  if (value >= bench.avg * 0.85) return 'Under snitt';
+  return 'Låg';
+}
+
+// Program code to Swedish name mapping
+export const PROGRAM_NAMES: Record<string, string> = {
+  'BF25': 'Barn- och fritid',
+  'BA25': 'Bygg- och anläggning',
+  'EE25': 'El- och energi',
+  'EK25': 'Ekonomi',
+  'ES25': 'Estetiska',
+  'FT25': 'Fordons- och transport',
+  'HA25': 'Handel',
+  'HT25': 'Hotell och turism',
+  'HV25': 'Hantverks',
+  'IN25': 'Industri',
+  'NA25': 'Naturvetenskap',
+  'NB25': 'Naturbruk',
+  'RL25': 'Restaurang- och livsmedels',
+  'SA25': 'Samhällsvetenskap',
+  'TE25': 'Teknik',
+  'VF25': 'VVS- och fastighet',
+  'VO25': 'Vård- och omsorg',
+  'IB': 'International Baccalaureate',
+  'FR25': 'Frisör',
+  'FO25': 'Fordon',
+  'SP25': 'Special',
+};
+
+export function getProgramName(code: string): string {
+  // Try exact match first
+  if (PROGRAM_NAMES[code]) return PROGRAM_NAMES[code];
+  // Try prefix match (EK25 -> EK)
+  const prefix = code.replace(/\d+$/, '');
+  for (const [key, name] of Object.entries(PROGRAM_NAMES)) {
+    if (key.startsWith(prefix)) return name;
+  }
+  return code; // Return code if no match
+}
 
 export type TestSubject = 'swedish' | 'english' | 'math';
 

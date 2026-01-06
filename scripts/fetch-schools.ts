@@ -30,11 +30,36 @@ interface StatValue {
   timePeriod: string;
 }
 
-interface StatisticsBody {
+interface GrundskoleStatisticsBody {
   averageGradesMeritRating9thGrade?: StatValue[];
+  ratioOfPupilsIn9thGradeWithAllSubjectsPassed?: StatValue[];
+  ratioOfPupilsIn6thGradeWithAllSubjectsPassed?: StatValue[];
+  averageResultNationalTestsSubjectSVE6thGrade?: StatValue[];
+  averageResultNationalTestsSubjectENG6thGrade?: StatValue[];
+  averageResultNationalTestsSubjectMA6thGrade?: StatValue[];
   studentsPerTeacherQuota?: StatValue[];
   certifiedTeachersQuota?: StatValue[];
-  ratioOfPupilsIn9thGradeWithAllSubjectsPassed?: StatValue[];
+  totalNumberOfPupils?: StatValue[];
+  [key: string]: unknown;
+}
+
+interface GymnasiumProgramMetric {
+  programCode: string;
+  ratioOfStudentsEligibleForUndergraduateEducation?: StatValue[];
+  gradesPointsForStudents?: StatValue[];
+  gradesPointsForStudentsWithExam?: StatValue[];
+  ratioOfPupilsWithExamWithin3Years?: StatValue[];
+  admissionPointsMin?: StatValue[];
+  admissionPointsAverage?: StatValue[];
+  totalNumberOfPupils?: StatValue[];
+  [key: string]: unknown;
+}
+
+interface GymnasiumStatisticsBody {
+  programMetrics?: GymnasiumProgramMetric[];
+  studentsPerTeacherQuota?: StatValue[];
+  certifiedTeachersQuota?: StatValue[];
+  totalNumberOfPupils?: StatValue[];
   [key: string]: unknown;
 }
 
@@ -54,61 +79,12 @@ interface SchoolDetailBody {
   [key: string]: unknown;
 }
 
-interface School {
-  id: string;
-  name: string;
-  coordinates: [number, number];
-  municipality: string;
-  type: 'municipal' | 'independent';
-  address: {
-    street: string;
-    postalCode: string;
-    city: string;
-  };
-  statistics: {
-    meritValue: number | null;
-    meritHistory: { year: string; value: number }[];
-    studentsPerTeacher: number | null;
-    certifiedTeachersRatio: number | null;
-    passRateGrade9: number | null;
-  };
-}
-
 interface RawSchoolData {
   schoolUnitCode: string;
   compactData: CompactSchoolUnit;
   details: SchoolDetailBody | null;
-  statistics: StatisticsBody | null;
-}
-
-// Parse Swedish decimal format "217,6" to 217.6
-function parseSwedishNumber(value: string | undefined): number | null {
-  if (!value || value === '.' || value === '-') return null;
-  const parsed = parseFloat(value.replace(',', '.'));
-  return isNaN(parsed) ? null : parsed;
-}
-
-// Get most recent value from StatValue array
-function getMostRecentValue(data: StatValue[] | undefined): number | null {
-  if (!data || data.length === 0) return null;
-  for (const entry of data) {
-    if (entry.valueType === 'EXISTS') {
-      return parseSwedishNumber(entry.value);
-    }
-  }
-  return null;
-}
-
-// Get merit history from StatValue array
-function getMeritHistory(data: StatValue[] | undefined): { year: string; value: number }[] {
-  if (!data) return [];
-  return data
-    .filter(entry => entry.valueType === 'EXISTS')
-    .map(entry => ({
-      year: entry.timePeriod,
-      value: parseSwedishNumber(entry.value) || 0,
-    }))
-    .slice(0, 5);
+  statistics: GrundskoleStatisticsBody | null;
+  gymnasiumStatistics: GymnasiumStatisticsBody | null;
 }
 
 async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
@@ -177,9 +153,20 @@ async function fetchSchoolDetails(schoolUnitCode: string): Promise<SchoolDetailB
   }
 }
 
-async function fetchSchoolStatistics(schoolUnitCode: string): Promise<StatisticsBody | null> {
+async function fetchGrundskoleStatistics(schoolUnitCode: string): Promise<GrundskoleStatisticsBody | null> {
   try {
     const url = `${API_BASE}/school-units/${schoolUnitCode}/statistics/gr`;
+    const response = await fetchWithRetry(url);
+    const data = await response.json();
+    return data.body || null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchGymnasiumStatistics(schoolUnitCode: string): Promise<GymnasiumStatisticsBody | null> {
+  try {
+    const url = `${API_BASE}/school-units/${schoolUnitCode}/statistics/gy`;
     const response = await fetchWithRetry(url);
     const data = await response.json();
     return data.body || null;
@@ -192,37 +179,6 @@ function hasValidCoordinates(school: CompactSchoolUnit): boolean {
   const lat = parseFloat(school.wgs84Latitude);
   const lng = parseFloat(school.wgs84Longitude);
   return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && !school.abroadSchool;
-}
-
-function processSchoolData(raw: RawSchoolData): School {
-  const { compactData, details, statistics } = raw;
-
-  const visitingAddress = details?.contactInfo?.addresses?.find(
-    a => a.type === 'VISITING_ADDRESS'
-  );
-
-  return {
-    id: compactData.schoolUnitCode,
-    name: compactData.schoolUnitName,
-    coordinates: [
-      parseFloat(compactData.wgs84Latitude),
-      parseFloat(compactData.wgs84Longitude),
-    ],
-    municipality: visitingAddress?.city || 'Unknown',
-    type: details?.principalOrganizerType === 'Kommunal' ? 'municipal' : 'independent',
-    address: {
-      street: visitingAddress?.street || '',
-      postalCode: visitingAddress?.zipCode || '',
-      city: visitingAddress?.city || '',
-    },
-    statistics: {
-      meritValue: getMostRecentValue(statistics?.averageGradesMeritRating9thGrade),
-      meritHistory: getMeritHistory(statistics?.averageGradesMeritRating9thGrade),
-      studentsPerTeacher: getMostRecentValue(statistics?.studentsPerTeacherQuota),
-      certifiedTeachersRatio: getMostRecentValue(statistics?.certifiedTeachersQuota),
-      passRateGrade9: getMostRecentValue(statistics?.ratioOfPupilsIn9thGradeWithAllSubjectsPassed),
-    },
-  };
 }
 
 async function main() {
@@ -250,11 +206,11 @@ async function main() {
 
   // Collect all raw data
   const rawData: RawSchoolData[] = [];
-  const schools: School[] = [];
   let processed = 0;
-  let withMeritData = 0;
+  let withGrundskoleData = 0;
+  let withGymnasiumData = 0;
 
-  console.log('\nFetching details and statistics...');
+  console.log('\nFetching details, grundskola stats, and gymnasium stats...');
   console.log('(This will take several minutes for ~6500 schools)\n');
 
   const batchSize = 10;
@@ -263,15 +219,17 @@ async function main() {
 
     const results = await Promise.all(
       batch.map(async (school) => {
-        const [details, statistics] = await Promise.all([
+        const [details, statistics, gymnasiumStatistics] = await Promise.all([
           fetchSchoolDetails(school.schoolUnitCode),
-          fetchSchoolStatistics(school.schoolUnitCode),
+          fetchGrundskoleStatistics(school.schoolUnitCode),
+          fetchGymnasiumStatistics(school.schoolUnitCode),
         ]);
         return {
           schoolUnitCode: school.schoolUnitCode,
           compactData: school,
           details,
-          statistics
+          statistics,
+          gymnasiumStatistics,
         };
       })
     );
@@ -280,21 +238,25 @@ async function main() {
       processed++;
       rawData.push(raw);
 
-      const school = processSchoolData(raw);
-      schools.push(school);
-      if (school.statistics.meritValue !== null) {
-        withMeritData++;
+      // Count schools with data
+      if (raw.statistics && Object.keys(raw.statistics).length > 0) {
+        withGrundskoleData++;
+      }
+      if (raw.gymnasiumStatistics && raw.gymnasiumStatistics.programMetrics && raw.gymnasiumStatistics.programMetrics.length > 0) {
+        withGymnasiumData++;
       }
     }
 
     if (processed % 500 === 0 || processed === schoolsWithCoords.length) {
-      console.log(`  Processed ${processed}/${schoolsWithCoords.length} - Found ${withMeritData} with merit data`);
+      console.log(`  Processed ${processed}/${schoolsWithCoords.length} - GR: ${withGrundskoleData}, GY: ${withGymnasiumData}`);
     }
 
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  console.log(`\nSchools with merit data: ${schools.length}`);
+  console.log(`\nFetch complete!`);
+  console.log(`  Schools with grundskola stats: ${withGrundskoleData}`);
+  console.log(`  Schools with gymnasium stats: ${withGymnasiumData}`);
 
   // Save all raw data for offline processing
   fs.writeFileSync(
@@ -303,23 +265,20 @@ async function main() {
   );
   console.log(`\nSaved all raw data to ${path.join(rawDataDir, 'all-school-data.json')}`);
 
-  // Sort and save processed data
-  schools.sort((a, b) => (b.statistics.meritValue || 0) - (a.statistics.meritValue || 0));
+  // Save fetch metadata
+  const metadata = {
+    fetchedAt: new Date().toISOString(),
+    totalSchools: rawData.length,
+    withGrundskoleStats: withGrundskoleData,
+    withGymnasiumStats: withGymnasiumData,
+  };
+  fs.writeFileSync(
+    path.join(rawDataDir, 'fetch-metadata.json'),
+    JSON.stringify(metadata, null, 2)
+  );
+  console.log('Saved fetch metadata');
 
-  const outputPath = path.join(__dirname, '../src/data/schools.json');
-  fs.writeFileSync(outputPath, JSON.stringify(schools, null, 2));
-  console.log(`Saved processed data to ${outputPath}`);
-
-  // Print stats
-  const avgMerit = schools.reduce((sum, s) => sum + (s.statistics.meritValue || 0), 0) / schools.length;
-  const municipalities = [...new Set(schools.map(s => s.municipality))];
-  console.log(`\nStats:`);
-  console.log(`  Total schools with merit data: ${schools.length}`);
-  console.log(`  Average merit: ${avgMerit.toFixed(1)}`);
-  console.log(`  Highest merit: ${schools[0]?.statistics.meritValue?.toFixed(1)} (${schools[0]?.name})`);
-  console.log(`  Municipal: ${schools.filter(s => s.type === 'municipal').length}`);
-  console.log(`  Independent: ${schools.filter(s => s.type === 'independent').length}`);
-  console.log(`  Municipalities: ${municipalities.length}`);
+  console.log(`\nRun "pnpm run process-data" to process the raw data into schools.json`);
 }
 
 main().catch(console.error);

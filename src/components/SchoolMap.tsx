@@ -134,9 +134,10 @@ function MapController({ center, onCenterHandled }: MapControllerProps) {
 
 interface SchoolMapProps {
   schools: School[];
+  dataFetchedAt?: string;
 }
 
-export default function SchoolMap({ schools }: SchoolMapProps) {
+export default function SchoolMap({ schools, dataFetchedAt }: SchoolMapProps) {
   const [homePosition, setHomePosition] = useState<HomePosition | null>(null);
   const [isSettingHome, setIsSettingHome] = useState(false);
   const [filteredSchools, setFilteredSchools] = useState<School[]>(schools);
@@ -292,6 +293,17 @@ export default function SchoolMap({ schools }: SchoolMapProps) {
       {isSettingHome && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full shadow-lg z-[1000]">
           Click on the map to set your home location
+        </div>
+      )}
+
+      {/* Data timestamp */}
+      {dataFetchedAt && (
+        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded px-2 py-1 text-xs text-gray-500 z-[1000]">
+          Data från Skolverket: {new Date(dataFetchedAt).toLocaleDateString('sv-SE', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
         </div>
       )}
     </div>

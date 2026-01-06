@@ -9,7 +9,11 @@ import {
   getTestPerformanceLevel,
   getTestPerformanceLabel,
   getPerformanceColor,
+  getGymnasiumPerformanceLevel,
+  getGymnasiumPerformanceLabel,
+  getProgramName,
   TEST_BENCHMARKS,
+  GYMNASIUM_BENCHMARKS,
 } from '@/lib/types';
 import { MapPin, Users, GraduationCap, CheckCircle, TrendingUp, TrendingDown, BookOpen } from 'lucide-react';
 
@@ -152,10 +156,97 @@ export default function SchoolPopup({ school, homePosition, distance }: SchoolPo
         </div>
       )}
 
-      {/* Gymnasium notice */}
-      {category === 'gymnasium' && (
+      {/* Gymnasium Data */}
+      {category === 'gymnasium' && (statistics.universityEligibilityRate !== null || statistics.gradePoints !== null) && (
+        <div className="mb-4">
+          {/* Aggregated metrics */}
+          <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+            {/* University Eligibility */}
+            <div
+              className="text-center p-1.5 rounded border-2"
+              style={{
+                borderColor: getPerformanceColor(getGymnasiumPerformanceLevel(statistics.universityEligibilityRate, 'universityEligibilityRate')),
+                backgroundColor: statistics.universityEligibilityRate !== null
+                  ? getPerformanceColor(getGymnasiumPerformanceLevel(statistics.universityEligibilityRate, 'universityEligibilityRate')) + '15'
+                  : '#f9fafb'
+              }}
+            >
+              <div className="text-gray-500 font-medium">Högskola</div>
+              <div className="font-bold">{statistics.universityEligibilityRate?.toFixed(0) ?? '-'}%</div>
+              {statistics.universityEligibilityRate !== null && (
+                <div className="text-[10px] opacity-80">
+                  {getGymnasiumPerformanceLabel(statistics.universityEligibilityRate, 'universityEligibilityRate')}
+                </div>
+              )}
+            </div>
+            {/* Grade Points */}
+            <div
+              className="text-center p-1.5 rounded border-2"
+              style={{
+                borderColor: getPerformanceColor(getGymnasiumPerformanceLevel(statistics.gradePoints, 'gradePoints')),
+                backgroundColor: statistics.gradePoints !== null
+                  ? getPerformanceColor(getGymnasiumPerformanceLevel(statistics.gradePoints, 'gradePoints')) + '15'
+                  : '#f9fafb'
+              }}
+            >
+              <div className="text-gray-500 font-medium">Betyg</div>
+              <div className="font-bold">{statistics.gradePoints?.toFixed(1) ?? '-'}</div>
+              {statistics.gradePoints !== null && (
+                <div className="text-[10px] opacity-80">
+                  {getGymnasiumPerformanceLabel(statistics.gradePoints, 'gradePoints')}
+                </div>
+              )}
+            </div>
+            {/* Graduation Rate */}
+            <div
+              className="text-center p-1.5 rounded border-2"
+              style={{
+                borderColor: getPerformanceColor(getGymnasiumPerformanceLevel(statistics.graduationRate, 'graduationRate')),
+                backgroundColor: statistics.graduationRate !== null
+                  ? getPerformanceColor(getGymnasiumPerformanceLevel(statistics.graduationRate, 'graduationRate')) + '15'
+                  : '#f9fafb'
+              }}
+            >
+              <div className="text-gray-500 font-medium">Examen</div>
+              <div className="font-bold">{statistics.graduationRate?.toFixed(0) ?? '-'}%</div>
+              {statistics.graduationRate !== null && (
+                <div className="text-[10px] opacity-80">
+                  {getGymnasiumPerformanceLabel(statistics.graduationRate, 'graduationRate')}
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400 mb-2">
+            Snitt: Högskola {GYMNASIUM_BENCHMARKS.universityEligibilityRate.avg}% · Betyg {GYMNASIUM_BENCHMARKS.gradePoints.avg} · Examen {GYMNASIUM_BENCHMARKS.graduationRate.avg}%
+          </p>
+
+          {/* Programs list */}
+          {statistics.programs && statistics.programs.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 font-medium mb-1">Program ({statistics.programs.length}):</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {statistics.programs.slice(0, 5).map((program, i) => (
+                  <div key={i} className="flex justify-between text-xs bg-gray-50 px-2 py-1 rounded">
+                    <span className="font-medium">{getProgramName(program.code)}</span>
+                    <span className="text-gray-500">
+                      {program.universityEligibilityRate !== null && `${program.universityEligibilityRate.toFixed(0)}%`}
+                      {program.admissionPointsAvg !== null && ` · ${program.admissionPointsAvg.toFixed(0)}p`}
+                    </span>
+                  </div>
+                ))}
+                {statistics.programs.length > 5 && (
+                  <p className="text-[10px] text-gray-400">+{statistics.programs.length - 5} fler program</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Gymnasium without data */}
+      {category === 'gymnasium' && statistics.universityEligibilityRate === null && statistics.gradePoints === null && (
         <div className="mb-4 p-2 bg-orange-50 rounded text-xs text-orange-700">
-          Gymnasium - gymnasiedata kommer snart
+          Gymnasiedata saknas för denna skola
         </div>
       )}
 

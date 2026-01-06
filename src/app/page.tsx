@@ -1,8 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import schools from '@/data/schools.json';
-import { School } from '@/lib/types';
+import schoolData from '@/data/schools.json';
+import { School, SchoolData } from '@/lib/types';
 
 // Dynamically import the map component with SSR disabled (Leaflet requires window)
 const SchoolMap = dynamic(() => import('@/components/SchoolMap'), {
@@ -17,10 +17,12 @@ const SchoolMap = dynamic(() => import('@/components/SchoolMap'), {
   ),
 });
 
+const data = schoolData as SchoolData;
+
 export default function Home() {
   return (
     <main className="h-screen w-full">
-      <SchoolMap schools={schools as School[]} />
+      <SchoolMap schools={data.schools as School[]} dataFetchedAt={data.metadata.fetchedAt} />
     </main>
   );
 }
