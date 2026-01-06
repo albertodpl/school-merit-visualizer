@@ -202,6 +202,7 @@ export default function SchoolMap({ schools, dataFetchedAt }: SchoolMapProps) {
       <MapContainer
         center={defaultCenter}
         zoom={defaultZoom}
+        zoomControl={true}
         className="h-full w-full"
         style={{ cursor: isSettingHome ? 'crosshair' : 'grab' }}
       >

@@ -7,7 +7,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Skolkarta - Swedish School Merit Visualizer",
-  description: "Interactive map visualization of Swedish school merit statistics (meritvärde). Compare grundskola performance across Sweden.",
+  description: "Interactive map of 6,500+ Swedish schools with performance data from Skolverket. Compare grundskola merit values, grade 6 test scores, and gymnasium statistics.",
   alternates: {
     canonical: 'https://skolkarta.albertoprietolofkrantz.dev',
   },
