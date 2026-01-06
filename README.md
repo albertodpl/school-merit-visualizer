@@ -47,6 +47,8 @@ pnpm run fetch-data
 pnpm run process-data
 ```
 
+The fetch timestamp is automatically saved to `src/data/schools.json` and displayed in the app. No manual date updates needed.
+
 ## License
 
 MIT
