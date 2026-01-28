@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,6 +26,45 @@ L.Icon.Default.mergeOptions({
 });
 
 type ColorMode = 'performance' | 'category';
+
+// Hook to sync with localStorage for home position
+const HOME_POSITION_KEY = 'homePosition';
+let homePositionListeners: Array<() => void> = [];
+
+function subscribeToHomePosition(callback: () => void) {
+  homePositionListeners.push(callback);
+  return () => {
+    homePositionListeners = homePositionListeners.filter(l => l !== callback);
+  };
+}
+
+function getHomePositionSnapshot(): HomePosition | null {
+  const saved = localStorage.getItem(HOME_POSITION_KEY);
+  return saved ? JSON.parse(saved) : null;
+}
+
+function getHomePositionServerSnapshot(): HomePosition | null {
+  return null;
+}
+
+function setStoredHomePosition(position: HomePosition | null) {
+  if (position) {
+    localStorage.setItem(HOME_POSITION_KEY, JSON.stringify(position));
+  } else {
+    localStorage.removeItem(HOME_POSITION_KEY);
+  }
+  // Notify all subscribers
+  homePositionListeners.forEach(l => l());
+}
+
+function useHomePosition(): [HomePosition | null, (position: HomePosition | null) => void] {
+  const position = useSyncExternalStore(
+    subscribeToHomePosition,
+    getHomePositionSnapshot,
+    getHomePositionServerSnapshot
+  );
+  return [position, setStoredHomePosition];
+}
 
 function createSchoolIcon(school: School, colorMode: ColorMode): L.DivIcon {
   let color: string;
@@ -138,43 +177,27 @@ interface SchoolMapProps {
 }
 
 export default function SchoolMap({ schools, dataFetchedAt }: SchoolMapProps) {
-  const [homePosition, setHomePosition] = useState<HomePosition | null>(null);
+  const [homePosition, setHomePosition] = useHomePosition();
   const [isSettingHome, setIsSettingHome] = useState(false);
   const [filteredSchools, setFilteredSchools] = useState<School[]>(schools);
   const [sortBy, setSortBy] = useState<'merit' | 'distance'>('merit');
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [colorMode, setColorMode] = useState<ColorMode>('category');
 
-  // Load home position from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('homePosition');
-    if (saved) {
-      setHomePosition(JSON.parse(saved));
-    }
-  }, []);
-
-  // Save home position to localStorage
-  useEffect(() => {
-    if (homePosition) {
-      localStorage.setItem('homePosition', JSON.stringify(homePosition));
-    }
-  }, [homePosition]);
-
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setHomePosition({ lat, lng });
     setIsSettingHome(false);
-  }, []);
+  }, [setHomePosition]);
 
   const handleClearHome = useCallback(() => {
     setHomePosition(null);
-    localStorage.removeItem('homePosition');
-  }, []);
+  }, [setHomePosition]);
 
   const handleHomePositionChange = useCallback((lat: number, lng: number) => {
     setHomePosition({ lat, lng });
     setMapCenter([lat, lng]);
     setIsSettingHome(false);
-  }, []);
+  }, [setHomePosition]);
 
   const handleMapCenterHandled = useCallback(() => {
     setMapCenter(null);

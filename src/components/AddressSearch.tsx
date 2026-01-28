@@ -85,7 +85,7 @@ export default function AddressSearch({
       const data: NominatimResult[] = await response.json();
       setResults(data);
       setIsOpen(data.length > 0);
-    } catch (err) {
+    } catch (_err) {
       setError('Could not search addresses');
       setResults([]);
     } finally {
